@@ -74,19 +74,41 @@ runcmd(struct cmd *cmd)
     /* MARK START task2
      * TAREFA2: Implemente codigo abaixo para executar
      * comandos simples. */
-    execvp(argv[0], argv);
-    fprintf(stderr, "exec nao implementado\n");
+    execvp(ecmd->argv[0], ecmd->argv);
+    // fprintf(stderr, "exec nao implementado\n");
     /* MARK END task2 */
     break;
 
   case '>':
+    rcmd = (struct redircmd*)cmd;
+
+    struct stat st;
+    stat(rcmd->file, &st);
+    // printf("Permissões do aquivo: %d", st.st_mode);
+
+    int outFileDescriptor = open(rcmd->file, rcmd->mode, S_IRWXU|S_IRWXG|S_IRWXO);
+
+    if(outFileDescriptor = -1)
+      fprintf(stderr, "Erro ao abrir o arquivo %s \n durante a execução da função '>' ", rcmd->file);
+
+    dup2(outFileDescriptor , rcmd->fd);
+    close(outFileDescriptor);
+
+    runcmd(rcmd->cmd);
+    break;
   case '<':
     rcmd = (struct redircmd*)cmd;
     /* MARK START task3
      * TAREFA3: Implemente codigo abaixo para executar
      * comando com redirecionamento. */
-    fprintf(stderr, "redir nao implementado\n");
+    // fprintf(stderr, "redir nao implementado\n");
     /* MARK END task3 */
+    int inFileDescriptor = open(rcmd->file, rcmd->mode, S_IRWXU|S_IRWXG|S_IRWXO);
+
+    if(inFileDescriptor = -1)
+      fprintf(stderr, "Erro ao abrir o arquivo %s \n durante a execução da função '<' ", rcmd->file);
+
+    dup2(inFileDescriptor , rcmd->fd);
     runcmd(rcmd->cmd);
     break;
 

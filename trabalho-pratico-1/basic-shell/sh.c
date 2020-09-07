@@ -86,9 +86,11 @@ runcmd(struct cmd *cmd)
     stat(rcmd->file, &st);
     // printf("Permissões do aquivo: %d", st.st_mode);
 
+    printf("Modo de abertura do arquivo: %d", rcmd->mode);
+
     int outFileDescriptor = open(rcmd->file, rcmd->mode, S_IRWXU|S_IRWXG|S_IRWXO);
 
-    if(outFileDescriptor = -1)
+    if(outFileDescriptor == -1)
       fprintf(stderr, "Erro ao abrir o arquivo %s \n durante a execução da função '>' ", rcmd->file);
 
     dup2(outFileDescriptor , rcmd->fd);
@@ -105,7 +107,7 @@ runcmd(struct cmd *cmd)
     /* MARK END task3 */
     int inFileDescriptor = open(rcmd->file, rcmd->mode, S_IRWXU|S_IRWXG|S_IRWXO);
 
-    if(inFileDescriptor = -1)
+    if(inFileDescriptor == -1)
       fprintf(stderr, "Erro ao abrir o arquivo %s \n durante a execução da função '<' ", rcmd->file);
 
     dup2(inFileDescriptor , rcmd->fd);

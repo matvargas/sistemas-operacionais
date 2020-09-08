@@ -86,9 +86,7 @@ runcmd(struct cmd *cmd)
     stat(rcmd->file, &st);
     // printf("Permissões do aquivo: %d", st.st_mode);
 
-    printf("Modo de abertura do arquivo: %d", rcmd->mode);
-
-    int outFileDescriptor = open(rcmd->file, rcmd->mode, S_IRWXU|S_IRWXG|S_IRWXO);
+    int outFileDescriptor = open(rcmd->file, rcmd->mode, S_IRWXU|S_IRWXG|S_IRWXO);    
 
     if(outFileDescriptor == -1)
       fprintf(stderr, "Erro ao abrir o arquivo %s \n durante a execução da função '>' ", rcmd->file);
@@ -119,8 +117,28 @@ runcmd(struct cmd *cmd)
     /* MARK START task4
      * TAREFA4: Implemente codigo abaixo para executar
      * comando com pipes. */
-    fprintf(stderr, "pipe nao implementado\n");
+    // fprintf(stderr, "pipe nao implementado\n");
     /* MARK END task4 */
+    if(pipe(p)== -1)
+      fprintf(stderr, "%s\n", "Erro: pipe");
+
+    pid_t cpid = fork();
+    int status;
+
+    if(cpid == -1){
+      fprintf(stderr, "%s\n", "Erro: fork");
+    } else if (cpid == 0) {
+      dup2(p[1], 1);
+      close(p[0]);
+      close(p[1]);
+      runcmd(pcmd->left);
+    } else {
+      dup2(p[0], 0);
+      close(p[0]);
+      close(p[1]);
+      waitpid(cpid, &status, 0);
+      runcmd(pcmd->right);
+    }
     break;
   }    
   exit(0);
@@ -149,11 +167,14 @@ main(void)
     /* MARK START task1 */
     /* TAREFA1: O que faz o if abaixo e por que ele é necessário?
      * Insira sua resposta no código e modifique o fprintf abaixo
-     * para reportar o erro corretamente. */
+     * para reportar o erro corretamente. 
+     * RESPOSTA:
+     * O if abaixo evita que o comando cd sem parâmtros seja executado, o que resultaria na troca para o diretório /homo/usuário
+     * */
     if(buf[0] == 'c' && buf[1] == 'd' && buf[2] == ' '){
       buf[strlen(buf)-1] = 0;
       if(chdir(buf+3) < 0)
-        fprintf(stderr, "reporte erro\n");
+        fprintf(stderr, "Erro ao abrir o diretŕio, nenhum diretório foi passado como parâmetro\n");
       continue;
     }
     /* MARK END task1 */

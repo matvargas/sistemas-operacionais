@@ -7,8 +7,9 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <sys/wait.h>
+#include <stdbool.h>
 
-/* MARK NAME Matheus Filipe Sieiro Vargas */
+/* MARK Matheus Filipe Sieiro Vargas */
 
 /****************************************************************
  * Shell xv6 simplificado
@@ -18,6 +19,7 @@
  ***************************************************************/
 
 #define MAXARGS 10
+#define MAXHISTORY 5
 
 /* Todos comandos tem um tipo.  Depois de olhar para o tipo do
  * comando, o código converte um *cmd para o tipo específico de
@@ -156,6 +158,31 @@ getcmd(char *buf, int nbuf)
   return 0;
 }
 
+char *history[MAXHISTORY];
+int historyCount = 0;
+
+void printHistory(){
+  for(int i=0; i < historyCount; i++)
+      printf("%d %s", i, history[i]);
+}
+
+void insertCmdHistoryList(char *command) {
+
+  printf("Inserting command: %s on list", command);
+
+  if(historyCount == MAXHISTORY) {
+    for(int i=0; i < MAXHISTORY - 1; i++)
+      history[i] = history[i+1];
+    history[historyCount] = command;
+  } else {
+    history[historyCount] = command;
+    historyCount++;
+  }
+
+  printHistory();
+  
+}
+
 int
 main(void)
 {
@@ -179,10 +206,22 @@ main(void)
     }
     /* MARK END task1 */
 
-    if(fork1() == 0)
-      runcmd(parsecmd(buf));
+    if(buf[0] == 'h' 
+      && buf[1] == 'i' 
+      && buf[2] == 's' 
+      && buf[3] == 't' 
+      && buf[4] == 'o'
+      && buf[5] == 'r' 
+      && buf[6] == 'y'){
+        printHistory();
+    } else {
+      insertCmdHistoryList(buf);
+      if(fork1() == 0)
+        runcmd(parsecmd(buf));
+    }
     wait(&r);
   }
+
   exit(0);
 }
 

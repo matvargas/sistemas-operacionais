@@ -170,14 +170,14 @@ void insertCmdHistoryList(char *command) {
 
   printf("Inserting command: %s on list", command);
 
-  if(historyCount == MAXHISTORY) {
-    for(int i=0; i < MAXHISTORY - 1; i++)
-      history[i] = history[i+1];
-    history[historyCount] = command;
-  } else {
+  // if(historyCount == MAXHISTORY) {
+  //   for(int i=0; i < MAXHISTORY - 1; i++)
+  //     history[i] = history[i+1];
+  //   history[historyCount] = command;
+  // } else {
     history[historyCount] = command;
     historyCount++;
-  }
+  // }
 
   printHistory();
   
@@ -187,10 +187,13 @@ int
 main(void)
 {
   static char buf[100];
+  char historyCommand[100];
   int r;
 
   // Ler e rodar comandos.
   while(getcmd(buf, sizeof(buf)) >= 0){
+    memcpy(buf, historyCommand, strlen(historyCommand) + 1);
+    printf("String copiada: %s \n", historyCommand);
     /* MARK START task1 */
     /* TAREFA1: O que faz o if abaixo e por que ele é necessário?
      * Insira sua resposta no código e modifique o fprintf abaixo
@@ -215,7 +218,7 @@ main(void)
       && buf[6] == 'y'){
         printHistory();
     } else {
-      insertCmdHistoryList(buf);
+      insertCmdHistoryList(historyCommand);
       if(fork1() == 0)
         runcmd(parsecmd(buf));
     }

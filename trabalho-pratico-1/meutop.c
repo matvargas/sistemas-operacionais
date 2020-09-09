@@ -1,11 +1,9 @@
 #include <stdio.h>
 #include <stdlib.h>
-#include <sys/stat.h>
-#include <sys/types.h>
-#include <sys/ioctl.h>
 #include <dirent.h>
 #include <string.h>
-#include <limits.h>
+#include <sys/stat.h>
+#include <sys/types.h>
 #include <pwd.h>
 #include <signal.h>
 #include <time.h>
@@ -13,19 +11,25 @@
 #include <unistd.h>
 
 #define PROC_PATH "/proc"
-#define STAT_FILENAME "stat"
+#define STAT "stat"
 
-#define MAX_DIGITS 20
+void printHeader(){
+    printf("%6s|%20s|%30s|%6s|\n", "PID", "User", "PROCNAME", "Estado");
+        printf("%6s|%20s|%30s|%6s|\n",  "------", "--------------------", "------------------------------",
+                                        "------");
+}
 
-#define INPUT_SEPARATORS " \n"
+void processOutput(char *s1, char *s2, char *s3, int c){
+    printf("%6s|%20s|%30s|%6c|\n",  s1, s2, s3, c);
+}
 
 int *trashInt;
 
-void refreshInputSelect(struct timeval *tv, fd_set *set){
-  tv->tv_sec = 5;
-  tv->tv_usec = 0;
-  FD_ZERO(set);
-  FD_SET(STDIN_FILENO, set);
+void repaintTop(struct timeval *t, fd_set *s){
+  t->tv_sec = 1;
+  t->tv_usec = 0;
+  FD_ZERO(s);
+  FD_SET(STDIN_FILENO, s);
 }
 
 char *pathBuilder(struct dirent* readingProcs){
@@ -34,124 +38,83 @@ char *pathBuilder(struct dirent* readingProcs){
     strcat(path, "/");
     strcat(path, readingProcs->d_name);
     strcat(path, "/");
-    strcat(path, STAT_FILENAME);
+    strcat(path, STAT);
     return path;
 }
 
 int main(int argc, char *argv[]){
 
-  DIR *procsDir;
-  struct dirent* readingProcs;
-  FILE *procStatFile;
-  char procName[BUFSIZ], filePath[NAME_MAX], procState, signalIn[255], *signalToken;
-  long int numberCheck;
-  struct stat fileStat;
-  struct passwd *pwd;
-  int procCount, keepLooping, signalingIndex, signalingStatus, signalPid, signalCode, selectReturn;
-  struct winsize w;
-  clock_t startTime;
-  struct timeval inputInterval;
-  fd_set inputFdSet;
+    FILE *procStatFile;
+    char procName[BUFSIZ], procState, signalIn[255], *signalToken;
+    long int avoidDirLong;
+    struct stat fileStat;
+    struct passwd *pwd;
+    int signalCode;
+    struct timeval timeToRepaint;
+    fd_set input;
 
-  trashInt = (int*) malloc(sizeof(int));
+    trashInt = (int*) malloc(sizeof(int));
 
-  ioctl(0, TIOCGWINSZ, &w);
-  refreshInputSelect(&inputInterval, &inputFdSet);
+    repaintTop(&timeToRepaint, &input);
 
-  keepLooping = 1;
-  signalingIndex = 0;
-  signalingStatus = 0;
+    DIR *dir;
 
-  while(keepLooping){
+    while(1){
 
-    printf("\e[2J\e[H\e[3J");
+        /** 
+        * Leitura e exibição dos processos.
+        **/
 
-    procsDir = opendir(PROC_PATH);
+        printf("\e[2J\e[H\e[3J");
+
+        dir = opendir(PROC_PATH);
     
+        printHeader();
     
-    printf("%8s|%16s|%24s|%8s|\n", "PID", "User", "PROCNAME", "Estado");
-    printf("%8s|%16s|%24s|%8s|\n",  "--------", "----------------", "------------------------",
-                                    "--------");
+        struct dirent* readingProcs;
+
+        while((readingProcs = readdir(dir))){
+        avoidDirLong = strtol(readingProcs->d_name, NULL, 10);
+        
+        if(avoidDirLong != 0L){
+            char *path = pathBuilder(readingProcs);
+            stat(path, &fileStat);
+            if((pwd = getpwuid(fileStat.st_uid)) != NULL){
+                procStatFile = fopen(path, "r");
+                fscanf(procStatFile, "%d", trashInt);
+                fscanf(procStatFile, "%s", procName);
+                fscanf(procStatFile, " %c", &procState);
+                processOutput(readingProcs->d_name, pwd->pw_name, procName + 1, procState);
+                fclose(procStatFile);
+            }
+        }
+        }
+
+        closedir(dir);
+
+    int slct = select(FD_SETSIZE, &input, NULL, NULL, &timeToRepaint);
     
-    while((readingProcs = readdir(procsDir))){
-      numberCheck = strtol(readingProcs->d_name, NULL, 10);
-      if(numberCheck == 0L || numberCheck == LONG_MAX || numberCheck == LONG_MIN){
-        //fprintf(stderr, "Diretorio nao de processo: %s\n", readingProcs->d_name);
-      }
-      else{
-        char *path = pathBuilder(readingProcs);
-        if(stat(path, &fileStat) == -1){
-          fprintf(stderr, "Erro: Stat de aqruivo: %s\n", path);
-          free(trashInt);
-          exit(EXIT_FAILURE);
-        }
-        else{
-          if((pwd = getpwuid(fileStat.st_uid)) != NULL){
-            if((procStatFile = fopen(path, "r")) == NULL){
-                fprintf(stderr, "Erro ao abrir arquivo de stat: %s\n", path);
-                free(trashInt);
-                exit(EXIT_FAILURE);
-            }
-            else{
-            //   procCount++;
-              fscanf(procStatFile, "%d", trashInt);
-              fscanf(procStatFile, "%s", procName);
-              fscanf(procStatFile, " %c", &procState);
-              printf("%8s|%16s|%25s%c|%8c|\n",  readingProcs->d_name, pwd->pw_name,
-                                                (procName + 1), 8, procState);
-              if(fclose(procStatFile) != 0){
-                fprintf(stderr, "Erro ao fechar arquivo de stat: %s\n", path);
-                free(trashInt);
-                exit(EXIT_FAILURE);
-              }
-            }
-          }
-          else{
-            fprintf(stderr, "Nao foi possivel achar o usuario de id: %d\n", fileStat.st_uid);
-            free(trashInt);
-            exit(EXIT_FAILURE);
-          }
-        }
-      }
-    }
+    if(slct >= 0){
+        fgets(signalIn, sizeof(signalIn), stdin);
+        signalToken = strtok(signalIn, " \n");
+      
+        avoidDirLong = strtol(signalToken, NULL, 10);
+        if(avoidDirLong != 0L){
 
-    if(closedir(procsDir) == -1){
-        fprintf(stderr, "Erro ao fechar o /proc\n");
-        free(trashInt);
-        exit(EXIT_FAILURE);
-    }
+            int id = avoidDirLong;
+            signalToken = strtok(NULL, " \n");
+            avoidDirLong = strtol(signalToken, NULL, 10);
 
-    if((selectReturn = select(FD_SETSIZE, &inputFdSet, NULL, NULL, &inputInterval)) <= -1){
-        fprintf(stderr, "Erro ao fazer select do input\n");
-        free(trashInt);
-        exit(EXIT_FAILURE);
-
-    }
-    else if(selectReturn >= 0){
-      fgets(signalIn, sizeof(signalIn), stdin);
-      signalToken = strtok(signalIn, INPUT_SEPARATORS);
-      if(strcmp(signalToken, "q") == 0){
-        keepLooping = 0;
-      }
-      else{
-        numberCheck = strtol(signalToken, NULL, 10);
-        if(numberCheck != 0L && numberCheck != LONG_MAX && numberCheck != LONG_MIN){
-          signalPid = numberCheck;
-          signalToken = strtok(NULL, INPUT_SEPARATORS);
-          numberCheck = strtol(signalToken, NULL, 10);
-          if(numberCheck != 0L && numberCheck != LONG_MAX && numberCheck != LONG_MIN){
-            signalCode = numberCheck;
-            signalToken = strtok(NULL, INPUT_SEPARATORS);
-            if(signalToken == NULL){
-              if(kill(signalPid, signalCode) == -1){
-                fprintf(stderr, "Nao foi possivel enviar sinal para o processo\n");
-              }
+            if(avoidDirLong != 0L){
+                signalCode = avoidDirLong;
+                signalToken = strtok(NULL, " \n");
+                if(signalToken == NULL){
+                    kill(id, signalCode);
+                }
             }
-          }
         }
-      }
     }
-    refreshInputSelect(&inputInterval, &inputFdSet);
+    repaintTop(&timeToRepaint, &input);
   }
 
     free(trashInt);
